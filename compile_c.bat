@@ -1,0 +1,1 @@
+call python ./c_python/setup.py build --build-lib=./c_python/
