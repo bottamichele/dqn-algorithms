@@ -23,7 +23,7 @@ def e_greedy_policy(model, epsilon, obs):
     q = model(obs)
 
     if rng.uniform() <= epsilon:
-        return rng.integers(0, q.shape[1])
+        return rng.integers(0, q.shape[1]).item()
     else:
         return q.argmax(dim=1).item()
 
