@@ -1,11 +1,14 @@
-import gym
+import gymnasium as gym
 import numpy as np
 import torch as tc
+
+from gymnasium.wrappers import FrameStackObservation, FlattenObservation
 
 from torch.nn.functional import mse_loss
 from torch.optim import Adam
 
 from dqn.nn.dqn import DQN
+from dqn.nn.dueling_dqn import DuelingDQN
 from dqn.memory.prop_prio_mem import PropPriorMemory
 from dqn.memory.uniform_memory import UniformMemory
 from dqn.policy import e_greedy_policy
@@ -28,6 +31,7 @@ LEARNING_RATE = 10**-3
 DEVICE = tc.device("cuda" if tc.cuda.is_available() else "cpu")
 USE_DDQN = True
 USE_PRIORITY_MEMORY = True
+USE_DUELING_ARCHITECTURE = True
 
 # ========================================
 # =============== COSTANTS ===============
@@ -36,13 +40,6 @@ USE_PRIORITY_MEMORY = True
 OBSERVATION_SIZE = 0
 ACTION_SIZE = 0
 RNG = np.random.default_rng()
-
-# ========================================
-# ========= ADDITIONAL FUNCTIONS =========
-# ========================================
-
-def add_observation(obs_stckd, obs):
-    return np.concatenate((obs_stckd[OBSERVATION_SIZE:], obs), dtype=np.float32)
 
 # ========================================
 # ================= MAIN =================
@@ -54,12 +51,19 @@ def main():
 
     #Create enviroment.
     env = gym.make("CartPole-v1")
+    if LAST_N_STATES >= 2:
+        env = FrameStackObservation(env, stack_size=LAST_N_STATES, padding_type="zero")
+        env = FlattenObservation(env)
     OBSERVATION_SIZE = env.observation_space.shape[0]
     ACTION_SIZE = env.action_space.n
 
     #Create model and target model.
-    model = DQN(OBSERVATION_SIZE * LAST_N_STATES, ACTION_SIZE, 256, 2).to(DEVICE)
-    target_model = DQN(OBSERVATION_SIZE * LAST_N_STATES, ACTION_SIZE, 256, 2).to(DEVICE)
+    if not USE_DUELING_ARCHITECTURE:
+        model = DQN(OBSERVATION_SIZE, ACTION_SIZE, 256, 2).to(DEVICE)
+        target_model = DQN(OBSERVATION_SIZE, ACTION_SIZE, 256, 2).to(DEVICE)
+    else:
+        model = DuelingDQN(OBSERVATION_SIZE, ACTION_SIZE, 256, 1, 1, 1).to(DEVICE)
+        target_model = DuelingDQN(OBSERVATION_SIZE, ACTION_SIZE, 256, 1, 1, 1).to(DEVICE)
     target_model.load_state_dict(model.state_dict())
 
     model.train()
@@ -69,9 +73,9 @@ def main():
 
     #Create memory replay.
     if not USE_PRIORITY_MEMORY:
-        memory = UniformMemory(MEMORY_SIZE, OBSERVATION_SIZE * LAST_N_STATES)
+        memory = UniformMemory(MEMORY_SIZE, OBSERVATION_SIZE)
     else:
-        memory = PropPriorMemory(MEMORY_SIZE, OBSERVATION_SIZE * LAST_N_STATES)
+        memory = PropPriorMemory(MEMORY_SIZE, OBSERVATION_SIZE)
         beta_decay = (1.0 - memory.beta) / EPISODES
 
     #Training phase.
@@ -82,25 +86,21 @@ def main():
     for episode in range(1, EPISODES+1):
         #Episode.
         obs, _ = env.reset()
-
-        obs_stckd      = add_observation(np.zeros(OBSERVATION_SIZE * LAST_N_STATES, dtype=np.float32), obs)
-        next_obs_stckd = add_observation(np.zeros(OBSERVATION_SIZE * LAST_N_STATES, dtype=np.float32), obs)
-        epis_done      = False
+        epis_done = False
         scores.append(0)
         
         while not epis_done:
             #Choose action.
             action = e_greedy_policy(model,
                                      epsilon,
-                                     tc.Tensor(np.array([obs_stckd])).to(DEVICE))
+                                     tc.Tensor(np.array([obs])).to(DEVICE))
 
             #Perform action choosen.
             next_obs, reward, terminated, truncated, _ = env.step(action)
-            next_obs_stckd = add_observation(next_obs_stckd, next_obs)
             epis_done = terminated or truncated
 
             #Store current transiction.
-            memory.store_transiction(obs_stckd, action, reward, next_obs_stckd, epis_done)
+            memory.store_transiction(obs, action, reward, next_obs, epis_done)
 
             #Do train step.
             if len(memory) >= BATCH_SIZE:
@@ -143,7 +143,7 @@ def main():
                     memory.beta += beta_decay
 
             #Updates.
-            obs_stckd = next_obs_stckd.copy()
+            obs = next_obs
             epsilon = epsilon - EPSILON_DECAY if epsilon > EPSILON_MIN else EPSILON_MIN
             scores[-1] += reward
             total_states += 1

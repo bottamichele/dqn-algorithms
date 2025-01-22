@@ -15,7 +15,7 @@ class PropPriorMemory(Memory):
         max_size: int
             max size of memory replay
             
-        obs_size: int
+        obs_size: int or tuple
             observation size
             
         alpha: float, optional

@@ -37,7 +37,7 @@ def compute_q_dqn(current_model, gamma, obs, action, reward, next_obs, next_obs_
     q_target: tc.Tensor
         q target values"""
     
-    assert(obs.shape[0] == action.shape[0] and obs.shape[0] == reward.shape[0] and obs.shape[0] == next_obs.shape[0] and obs.shape[0] == next_obs_done.shape[0])
+    assert (obs.shape[0] == action.shape[0] and obs.shape[0] == reward.shape[0] and obs.shape[0] == next_obs.shape[0] and obs.shape[0] == next_obs_done.shape[0]), "Batch sizes must be the same."
     idxs = np.arange(0, obs.shape[0], 1, dtype=np.int32)
     
     if target_model is None:
@@ -85,7 +85,7 @@ def compute_q_ddqn(current_model, target_model, gamma, obs, action, reward, next
     q_target: tc.Tensor
         q target values"""
     
-    assert(obs.shape[0] == action.shape[0] and obs.shape[0] == reward.shape[0] and obs.shape[0] == next_obs.shape[0] and obs.shape[0] == next_obs_done.shape[0])
+    assert (obs.shape[0] == action.shape[0] and obs.shape[0] == reward.shape[0] and obs.shape[0] == next_obs.shape[0] and obs.shape[0] == next_obs_done.shape[0]), "Batch sizes must be the same."
     idxs = np.arange(0, obs.shape[0], 1, dtype=np.int32)
 
     q = current_model(obs)[idxs, action]

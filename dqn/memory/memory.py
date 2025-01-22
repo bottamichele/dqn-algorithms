@@ -13,7 +13,7 @@ class Memory(ABC):
         max_size: int
             max size of memory replay
             
-        obs_size: int
+        obs_size: int or tuple
             observation size
             
         obs_dtype: np.dtype, optional
@@ -29,7 +29,7 @@ class Memory(ABC):
         if max_size <= 0:
             raise ValueError("max size of memory replay must be at least 1 element")
         
-        if obs_size <= 0:
+        if isinstance(obs_size, int) and obs_size <= 0:
             raise ValueError("observation size must be positive integer")
         
         if act_dtype != np.int8 and act_dtype != np.int16 and act_dtype != np.int32:
@@ -41,10 +41,14 @@ class Memory(ABC):
         self._max_size = max_size
 
         #Memory replay.
-        self._obss           = np.zeros((max_size, obs_size), dtype=obs_dtype)
+        if isinstance(obs_size, tuple): 
+            self._obss      = np.zeros((max_size, *obs_size), dtype=obs_dtype)
+            self._next_obss = np.zeros((max_size, *obs_size), dtype=obs_dtype)
+        else: 
+            self._obss      = np.zeros((max_size, obs_size), dtype=obs_dtype)
+            self._next_obss = np.zeros((max_size, obs_size), dtype=obs_dtype)
         self._actions        = np.zeros(max_size, dtype=act_dtype)
         self._rewards        = np.zeros(max_size, dtype=rew_dtype)
-        self._next_obss      = np.zeros((max_size, obs_size), dtype=obs_dtype)
         self._next_obss_done = np.zeros(max_size, dtype=bool)
 
     def __len__(self):
