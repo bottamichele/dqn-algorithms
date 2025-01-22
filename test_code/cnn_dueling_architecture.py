@@ -2,7 +2,6 @@ import gymnasium as gym
 import numpy as np
 import torch as tc
 
-from gymnasium import Wrapper
 from gymnasium.spaces import Box
 from gymnasium.wrappers import GrayscaleObservation, ResizeObservation, FrameStackObservation, TransformObservation
 
@@ -19,7 +18,7 @@ from dqn.q_methods import compute_q_ddqn
 # ============ HYPERPARAMETERS ===========
 # ========================================
 
-FRAME_SKIP = 4
+FRAME_STACK = 4
 TARGET_TOTAL_FRAMES = 100000
 BATCH_SIZE = 64
 GAMMA = 0.99
@@ -40,27 +39,6 @@ OBSERVATION_SIZE = 0
 ACTION_SIZE = 0
 
 # ========================================
-# ======== FRAME SKIP OBSERVATION ========
-# ========================================
-
-class FrameSkipObservation(Wrapper):
-    def __init__(self, env, frame_skip):
-        super().__init__(env)
-        self._frame_skip = frame_skip
-
-    def step(self, action):
-        total_reward = 0.0
-        
-        for _ in range(self._frame_skip):
-            obs, reward, terminated, truncated, info = self.env.step(action)
-            
-            total_reward += reward
-            if terminated or truncated:
-                break
-
-        return obs, total_reward, terminated, truncated, info
-
-# ========================================
 # ================= MAIN =================
 # ========================================
 
@@ -73,7 +51,7 @@ def main():
     env = TransformObservation(env, lambda x:env.render(), Box(low=0, high=255, shape=(400, 600, 3), dtype=np.uint8))
     env = GrayscaleObservation(env)
     env = ResizeObservation(env, (84, 84))
-    env = FrameStackObservation(env, stack_size=4, padding_type="zero")
+    env = FrameStackObservation(env, stack_size=FRAME_STACK, padding_type="zero")
     OBSERVATION_SIZE = env.observation_space.shape
     ACTION_SIZE = env.action_space.n
 
@@ -152,6 +130,6 @@ def main():
                 target_model.load_state_dict(model.state_dict())
 
         #Print training stats of current epidode ended.
-        print("- Episode {:3d}: score = {:3d}; avg score = {:3.2f}; total frames = {:>5d}; epsilon = {:.2f}".format(int(episode), int(scores[-1]), np.mean(scores[-100:]), int(total_frames), epsilon))
+        print("- Episode {:>3d}: score = {:3d}; avg score = {:3.2f}; total frames = {:>5d}; epsilon = {:.2f}".format(int(episode), int(scores[-1]), np.mean(scores[-100:]), int(total_frames), epsilon))
 
     env.close()
