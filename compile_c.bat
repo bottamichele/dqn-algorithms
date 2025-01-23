@@ -1,1 +1,2 @@
-call python ./c_python/setup.py build --build-lib=./c_python/
+call python ./dqn/c_modules/setup.py build --build-lib=./dqn/c_modules/
+pause

@@ -1,7 +1,7 @@
 import numpy as np
 import torch as tc
 
-from c_python.sum_tree import SumTree
+from ..c_modules.sum_tree import SumTree
 
 from .memory import Memory
 
