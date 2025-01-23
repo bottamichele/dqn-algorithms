@@ -1,5 +1,4 @@
 import torch as tc
-import numpy as np
 
 from .memory import Memory
 
