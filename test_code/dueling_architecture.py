@@ -2,7 +2,7 @@ import gymnasium as gym
 import numpy as np
 import torch as tc
 
-from gymnasium.wrappers import FrameStackObservation, FlattenObservation
+from gymnasium.wrappers import FrameStackObservation, FlattenObservation, NumpyToTorch
 
 from torch.nn.functional import mse_loss
 from torch.optim import Adam
@@ -39,7 +39,6 @@ USE_DUELING_ARCHITECTURE = True
 
 OBSERVATION_SIZE = 0
 ACTION_SIZE = 0
-RNG = np.random.default_rng()
 
 # ========================================
 # ================= MAIN =================
@@ -54,6 +53,7 @@ def main():
     if LAST_N_STATES >= 2:
         env = FrameStackObservation(env, stack_size=LAST_N_STATES, padding_type="zero")
         env = FlattenObservation(env)
+    env = NumpyToTorch(env, device=DEVICE)
     OBSERVATION_SIZE = env.observation_space.shape[0]
     ACTION_SIZE = env.action_space.n
 
@@ -73,9 +73,9 @@ def main():
 
     #Create memory replay.
     if not USE_PRIORITY_MEMORY:
-        memory = UniformMemory(MEMORY_SIZE, OBSERVATION_SIZE)
+        memory = UniformMemory(MEMORY_SIZE, OBSERVATION_SIZE, device=DEVICE)
     else:
-        memory = PropPriorMemory(MEMORY_SIZE, OBSERVATION_SIZE)
+        memory = PropPriorMemory(MEMORY_SIZE, OBSERVATION_SIZE, device=DEVICE)
         beta_decay = (1.0 - memory.beta) / EPISODES
 
     #Training phase.
@@ -93,7 +93,7 @@ def main():
             #Choose action.
             action = e_greedy_policy(model,
                                      epsilon,
-                                     tc.Tensor(np.array([obs])).to(DEVICE))
+                                     tc.unsqueeze(obs, 0).to(device=DEVICE))
 
             #Perform action choosen.
             next_obs, reward, terminated, truncated, _ = env.step(action)
@@ -110,15 +110,9 @@ def main():
                 else:
                     obs_b, action_b, reward_b, next_obs_b, next_obs_done_b, weight_b = memory.sample_batch(BATCH_SIZE)
 
-                #Convert to tensor.
-                obs_b           = tc.Tensor(obs_b).to(DEVICE, dtype=tc.float32)
-                action_b        = tc.Tensor(action_b).to(DEVICE, dtype=tc.int32)
-                reward_b        = tc.Tensor(reward_b).to(DEVICE, dtype=tc.float32)
-                next_obs_b      = tc.Tensor(next_obs_b).to(DEVICE, dtype=tc.float32)
-                next_obs_done_b = tc.Tensor(next_obs_done_b).to(DEVICE, dtype=tc.int32)
-
-                if USE_PRIORITY_MEMORY:
-                    weight_b = tc.Tensor(weight_b).to(DEVICE, dtype=tc.float32)
+                #Convertion.
+                action_b = action_b.to(dtype=tc.int32)
+                next_obs_done_b = next_obs_done_b.to(dtype=tc.int32)
 
                 #Computet q values.
                 if not USE_DDQN:
@@ -139,7 +133,7 @@ def main():
                 #Update priorities if USE_PRIORITY_MEMORY is True.
                 if USE_PRIORITY_MEMORY:
                     td_errors = tc.clamp(q_target - q, -1.0, 1.0)
-                    memory.update_priorities(td_errors.cpu().detach().numpy())
+                    memory.update_priorities(td_errors)
                     memory.beta += beta_decay
 
             #Updates.

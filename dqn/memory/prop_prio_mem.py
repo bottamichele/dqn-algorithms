@@ -1,4 +1,5 @@
 import numpy as np
+import torch as tc
 
 from c_python.sum_tree import SumTree
 
@@ -7,7 +8,7 @@ from .memory import Memory
 class PropPriorMemory(Memory):
     """A proportional prioritized memory replay. It samples a batch in order to transiction's priority."""
 
-    def __init__(self, max_size, obs_size, alpha=0.6, beta=0.4, eps=10**-5, obs_dtype=np.float32, act_dtype=np.int8, rew_dtype=np.float32):
+    def __init__(self, max_size, obs_size, alpha=0.6, beta=0.4, eps=10**-5, obs_dtype=tc.float32, act_dtype=tc.int8, rew_dtype=tc.float32, device=tc.device("cpu")):
         """Create new memory replay.
         
         Parameters
@@ -27,23 +28,26 @@ class PropPriorMemory(Memory):
         eps: float, optional
             small value to avoid division by zero
             
-        obs_dtype: np.dtype, optional
+        obs_dtype: tc.dtype, optional
             observation data type
             
-        act_dtype: np.dtype, optional
+        act_dtype: tc.dtype, optional
             action data type
             
-        rew_dtype: np.dtype, optional
-            reward data type"""
+        rew_dtype: tc.dtype, optional
+            reward data type
+            
+        device: tc.device, optional
+            device where the memory replay is on"""
         
-        super().__init__(max_size, obs_size, obs_dtype, act_dtype, rew_dtype)
+        super().__init__(max_size, obs_size, obs_dtype, act_dtype, rew_dtype, device)
 
-        self._priorities = np.zeros(max_size, dtype=np.float32)             #Priority for each transiction.
-        self._cum_prios = SumTree(max_size)                                 #Cumulative priorities.
+        self._priorities = tc.zeros(max_size, dtype=tc.float32, device=device)      #Priority for each transiction.
+        self._cum_prios = SumTree(max_size)                                         #Cumulative priorities.
         self._alpha = alpha
         self.beta = beta
-        self._epsilon = eps                                                 #Small value epsilon.
-        self._idxs_sampled = None                                           #Last sample of batch indices.
+        self._epsilon = eps                                                         #Small value epsilon.
+        self._idxs_sampled = None                                                   #Last sample of batch indices.
 
     def __reduce__(self):
         reduce_state = super().__reduce__()
@@ -64,7 +68,7 @@ class PropPriorMemory(Memory):
 
     def store_transiction(self, obs, action, reward, next_obs, next_obs_done):
         #Set priority for current transiction.
-        prio = np.max(self._priorities) if self._current_size > 0 else 1.0
+        prio = self._priorities.max().item() if self._current_size > 0 else 1.0
         
         self._priorities[self._current_idx] = prio
         self._cum_prios.set_priority(self._current_idx, prio**self._alpha)
@@ -82,32 +86,35 @@ class PropPriorMemory(Memory):
             
         Returns
         --------------------
-        obs_batch: np.ndarray
+        obs_batch: tc.Tensor
             observation batch sampled from memory replay
             
-        action_batch: np.ndarray
+        action_batch: tc.Tensor
             action batch sampled from memory replay
             
-        reward_batch: np.ndarray
+        reward_batch: tc.Tensor
             reward batch sampled from memory replay
             
-        next_batch: np.ndarray
+        next_batch: tc.Tensor
             next observations batch sampled from memory replay
             
-        next_obs_done_batch: np.ndarray
+        next_obs_done_batch: tc.Tensor
             next observations done batch sampled from memory replay
             
-        weights_batch: np.ndarray
+        weights_batch: tc.Tensor
             weights batch sampled from memory replay"""
         
         #Sample index of transictions and probabilties
         idxs = self._cum_prios.sample_batch(batch_size)
         probs = self._cum_prios.get_probability_of_batch(idxs)
+        
+        idxs = tc.Tensor(idxs).to(dtype=tc.int32, device=self._device)
+        probs = tc.Tensor(probs).to(device=self._device)
         self._idxs_sampled = idxs
 
         #Compute weights.
         weights = (self._max_size * probs)**(-self.beta)
-        weights /= np.max(weights)
+        weights /= weights.max().item()
 
         obs_b, action_b, reward_b, next_obs_b, next_obs_done_b = self._sample_batch_idxs(idxs)
         return obs_b, action_b, reward_b, next_obs_b, next_obs_done_b, weights
@@ -117,11 +124,14 @@ class PropPriorMemory(Memory):
         
         Parameter
         --------------------
-        td_errors: np.ndarray
+        td_errors: tc.Tensor
             temporal difference errors"""
         
-        assert len(self._idxs_sampled) == len(td_errors)
+        assert self._idxs_sampled.shape == td_errors.shape
 
-        for i in range(self._idxs_sampled.size):
-            idx = self._idxs_sampled[i]
-            self._priorities[idx] = abs(td_errors[i]) + self._epsilon
+        with tc.no_grad():
+            self._priorities[self._idxs_sampled] = tc.abs(td_errors) + self._epsilon
+
+        # for i in range(self._idxs_sampled.shape[0]):
+        #     idx = self._idxs_sampled[i].item()
+        #     self._priorities[idx] = abs(td_errors[i].item()) + self._epsilon

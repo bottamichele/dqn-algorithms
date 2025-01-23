@@ -3,7 +3,7 @@ import numpy as np
 import torch as tc
 
 from gymnasium.spaces import Box
-from gymnasium.wrappers import GrayscaleObservation, ResizeObservation, FrameStackObservation, TransformObservation
+from gymnasium.wrappers import GrayscaleObservation, ResizeObservation, FrameStackObservation, TransformObservation, NumpyToTorch
 
 from torch.nn.functional import mse_loss
 from torch.optim import Adam
@@ -46,12 +46,15 @@ def main():
     global OBSERVATION_SIZE
     global ACTION_SIZE
 
+    assert FRAME_STACK >= 2
+
     #Create enviroment.
     env = gym.make("CartPole-v1", render_mode="rgb_array")
     env = TransformObservation(env, lambda x:env.render(), Box(low=0, high=255, shape=(400, 600, 3), dtype=np.uint8))
     env = GrayscaleObservation(env)
     env = ResizeObservation(env, (84, 84))
     env = FrameStackObservation(env, stack_size=FRAME_STACK, padding_type="zero")
+    env = NumpyToTorch(env, device=DEVICE)
     OBSERVATION_SIZE = env.observation_space.shape
     ACTION_SIZE = env.action_space.n
 
@@ -70,7 +73,7 @@ def main():
     optimizer = Adam(model.parameters(), lr=LEARNING_RATE)
 
     #Create memory replay.
-    memory = UniformMemory(MEMORY_SIZE, OBSERVATION_SIZE, obs_dtype=np.uint8)
+    memory = UniformMemory(MEMORY_SIZE, OBSERVATION_SIZE, obs_dtype=tc.uint8, device=DEVICE)
 
     #Training phase.
     scores = []
@@ -89,7 +92,7 @@ def main():
             #Choose action.
             action = e_greedy_policy(model,
                                      epsilon,
-                                     tc.Tensor(np.array([obs])).to(DEVICE) / 255.0)
+                                     tc.unsqueeze(obs, 0).to(dtype=tc.float32, device=DEVICE) / 255.0)
 
             #Perform action choosen.
             next_obs, reward, terminated, truncated, _ = env.step(action)
@@ -103,12 +106,15 @@ def main():
                 #Sample mini-batch.
                 obs_b, action_b, reward_b, next_obs_b, next_obs_done_b = memory.sample_batch(BATCH_SIZE)
 
-                #Convert to tensor.
-                obs_b           = tc.Tensor(obs_b).to(DEVICE, dtype=tc.float32) / 255.0
-                action_b        = tc.Tensor(action_b).to(DEVICE, dtype=tc.int32)
-                reward_b        = tc.Tensor(reward_b).to(DEVICE, dtype=tc.float32)
-                next_obs_b      = tc.Tensor(next_obs_b).to(DEVICE, dtype=tc.float32) / 255.0
-                next_obs_done_b = tc.Tensor(next_obs_done_b).to(DEVICE, dtype=tc.int32)
+                #Convertion.
+                obs_b = obs_b.to(dtype=tc.float32)
+                next_obs_b = next_obs_b.to(dtype=tc.float32)
+                action_b = action_b.to(dtype=tc.int32)
+                next_obs_done_b = next_obs_done_b.to(dtype=tc.int32)
+
+                #Normalize observations.
+                obs_b /= 255.0
+                next_obs_b /= 255.0
 
                 #Computet q values.
                 q, q_target = compute_q_ddqn(model, target_model, GAMMA, obs_b, action_b, reward_b, next_obs_b, next_obs_done_b)
