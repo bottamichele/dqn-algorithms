@@ -1,6 +1,6 @@
 import torch as tc
 
-from .memory import Memory
+from ._memory import Memory
 
 class UniformMemory(Memory):
     """A memory replay that ramdomly samples a batch from."""

@@ -8,11 +8,11 @@ from gymnasium.wrappers import GrayscaleObservation, ResizeObservation, FrameSta
 from torch.nn.functional import mse_loss
 from torch.optim import Adam
 
-from dqn.cnn.cnn_dqn import CnnDQN
-from dqn.cnn.cnn_dueling_dqn import CnnDuelingDQN
-from dqn.memory.uniform_memory import UniformMemory
-from dqn.policy import e_greedy_policy
-from dqn.q_methods import compute_q_ddqn
+from dqn_algorithms.cnn import CnnDQN
+from dqn_algorithms.cnn import CnnDuelingDQN
+from dqn_algorithms.memory import UniformMemory
+from dqn_algorithms.policy import e_greedy_policy
+from dqn_algorithms.q_methods import compute_q_ddqn
 
 # ========================================
 # ============ HYPERPARAMETERS ===========
@@ -42,10 +42,7 @@ ACTION_SIZE = 0
 # ================= MAIN =================
 # ========================================
 
-def main():
-    global OBSERVATION_SIZE
-    global ACTION_SIZE
-
+if __name__ == "__main__":
     assert FRAME_STACK >= 2
 
     #Create enviroment.

@@ -1,8 +1,8 @@
 import torch as tc
 
-from ..c_modules.sum_tree import SumTree
+from dqn_algorithms._c_modules.sum_tree import SumTree
 
-from .memory import Memory
+from ._memory import Memory
 
 class PropPriorMemory(Memory):
     """A proportional prioritized memory replay. It samples a batch in order to transiction's priority."""

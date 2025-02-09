@@ -7,18 +7,18 @@ from gymnasium.wrappers import FrameStackObservation, FlattenObservation, NumpyT
 from torch.nn.functional import mse_loss
 from torch.optim import Adam
 
-from dqn.nn.dqn import DQN
-from dqn.nn.dueling_dqn import DuelingDQN
-from dqn.memory.prop_prio_mem import PropPriorMemory
-from dqn.memory.uniform_memory import UniformMemory
-from dqn.policy import e_greedy_policy
-from dqn.q_methods import compute_q_ddqn, compute_q_dqn
+from dqn_algorithms.nn import DQN
+from dqn_algorithms.nn import DuelingDQN
+from dqn_algorithms.memory import PropPriorMemory
+from dqn_algorithms.memory import UniformMemory
+from dqn_algorithms.policy import e_greedy_policy
+from dqn_algorithms.q_methods import compute_q_ddqn, compute_q_dqn
 
 # ========================================
 # ============ HYPERPARAMETERS ===========
 # ========================================
 
-LAST_N_STATES = 4
+LAST_N_STATES = 1
 EPISODES = 500
 BATCH_SIZE = 32
 GAMMA = 0.99
@@ -44,10 +44,7 @@ ACTION_SIZE = 0
 # ================= MAIN =================
 # ========================================
 
-def main():
-    global OBSERVATION_SIZE
-    global ACTION_SIZE
-
+if __name__ == "__main__":
     #Create enviroment.
     env = gym.make("CartPole-v1")
     if LAST_N_STATES >= 2:

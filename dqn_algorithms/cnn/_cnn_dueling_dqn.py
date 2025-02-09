@@ -1,6 +1,6 @@
 from torch.nn import Module, Sequential, Conv2d, Linear, ReLU
 
-from .utils import output_dim_conv2d
+from ._utils import output_dim_conv2d
 
 class CnnDuelingDQN(Module):
     """A Dueling Deep Q-Networks which employs 2D convolution layers."""
