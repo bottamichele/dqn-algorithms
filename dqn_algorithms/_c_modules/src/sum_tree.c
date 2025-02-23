@@ -25,17 +25,53 @@ typedef struct {
  * =========== USEFUL FUNCTIONS ===========
  * ========================================*/
 
-//Return index parent of a node.
-static int getParentIndex(SumTree* self, int idx_node) {
-    //Is idx_node root node ?
-    if (idx_node == 0)
-        return -1;
-
-    return (idx_node + 1) / 2 - 1;
+/* Check if a node index is correct.
+ * @param self a SumTree instance.
+ * @param idx_node a node index.
+ * @return 1 if node index is correct, 0 otherwise. */
+static int checkNodeIndex(SumTree* self, int idx_node) {
+    return idx_node >= 0 && idx_node < self->total_nodes;
 }
 
-//Get children indices of a node.
-static void getChildrenIndices(SumTree* self, int idx_node, int* idx_left_c, int* idx_right_c) {
+/* Get parent index of a node.
+ * @param self a SumTree instance.
+ * @param idx_node a node index.
+ * @param idx_parent parent node index of idx_node.
+ * @return 1 if this function does not raise any exception, 0 otherwise. */
+static int getParentIndex(SumTree* self, int idx_node, int* idx_parent) {
+    if(!checkNodeIndex(self, idx_node)) {
+        char msg[150];
+        sprintf(msg, "SumTree's node index %d is not allowed and must be between 0 and %d.", idx_node, self->total_nodes-1);
+
+        PyErr_SetString(PyExc_ValueError, msg);
+        return 0;
+    }
+
+    //Is node_idx root node?
+    if (idx_node == 0)
+        *idx_parent = -1;
+    else
+        *idx_parent = (idx_node + 1) / 2 - 1;
+
+    return 1;
+}
+
+/* Get children indices of a node.
+ * @param self a SumTree instance.
+ * @param idx_node a node index.
+ * @param idx_left_c left child index of idx_node.
+ * @param idx_right_c right child index of idx_node.
+ * @return 1 if this function does not raise any exception, 0 otherwise.*/
+static int getChildrenIndices(SumTree* self, int idx_node, int* idx_left_c, int* idx_right_c) {
+    if(!checkNodeIndex(self, idx_node)) {
+        char msg[150];
+        sprintf(msg, "SumTree's node index %d is not allowed and must be between 0 and %d.", idx_node, self->total_nodes-1);
+
+        PyErr_SetString(PyExc_ValueError, msg);
+        return 0;
+    }
+
+    //Get children indices.
     *idx_left_c = 2 * idx_node + 1;       // <--- 2 * (idx_node + 1) - 1
     *idx_right_c = 2 * idx_node + 2;      // <--- 2 * (idx_node + 1) + 1 - 1
 
@@ -44,17 +80,23 @@ static void getChildrenIndices(SumTree* self, int idx_node, int* idx_left_c, int
         *idx_left_c = -1;
         *idx_right_c = -1;
     }
+
+    return 1;
 }
 
-//Sample ramdomly a transiction index.
-static int getRandomTransiction(SumTree* self) {
-    float* treeData = PyArray_DATA((PyArrayObject*) self->tree);
+/* Sample ramdomly a transiction index.
+ * @param self a SumTree instance.
+ * @param idx_trans transiction index sampled.
+ * @return 1 if this function does not raise any exception, 0 otherwise. */
+static int getRandomTransiction(SumTree* self, int* idx_trans) {
+    float* treeData = (float*) PyArray_DATA((PyArrayObject*) self->tree);
     float up = treeData[0];
     int idx_node = 0;
     float p = up * ((float)rand() / (float)RAND_MAX);
     
     int idx_lc, idx_rc;
-    getChildrenIndices(self, idx_node, &idx_lc, &idx_rc);
+    if(!getChildrenIndices(self, idx_node, &idx_lc, &idx_rc))
+        return 0;
 
     while (idx_lc != -1 && idx_rc != -1) {
         if (p <= up - treeData[idx_rc]) {
@@ -64,16 +106,37 @@ static int getRandomTransiction(SumTree* self) {
         else
             idx_node = idx_rc;
 
-        getChildrenIndices(self, idx_node, &idx_lc, &idx_rc);
+        if(!getChildrenIndices(self, idx_node, &idx_lc, &idx_rc))
+            return 0;
     }
 
-    return idx_node - ((int)pow(2, self->depth) - 1);
+    *idx_trans = idx_node - ((int)pow(2, self->depth) - 1);
+    return 1;
 }
 
-//Get probability of a transiction index.
-static float getProbabilityOfTransiction(SumTree* self, int idx_trans) {
-    float* treeData = PyArray_DATA((PyArrayObject*) self->tree);
-    return treeData[(int)pow(2, self->depth) - 1 + idx_trans] / treeData[0];
+/* Return probability of a transiction index.
+ * @param self a SumTree instance.
+ * @param idx_trans a transiction index.
+ * @param p probability of idx_trans.
+ * @return 1 if this function does not raise any exception, 0 otherwise. */
+static int getTransictionProbability(SumTree* self, int idx_trans, float* p) {
+    if(idx_trans < 0 || idx_trans >= self->n_leaves) {
+        char msg[150];
+        sprintf(msg, "idx_trans is out of range for SumTree and is %d. It must be between 0 and %d.", idx_trans, self->n_leaves-1);
+
+        PyErr_SetString(PyExc_IndexError, msg);
+        return 0;
+    }
+    
+    float* treeData = (float*) PyArray_DATA((PyArrayObject*) self->tree);
+
+    if(treeData[0] == 0.f) {
+        PyErr_SetString(PyExc_ZeroDivisionError, "SumTree's root node is 0.0");
+        return 0;
+    }
+
+    *p = treeData[(int)pow(2, self->depth) - 1 + idx_trans] / treeData[0];
+    return 1;
 }
 
 
@@ -115,8 +178,10 @@ static int SumTree_Init(SumTree* self, PyObject* args, PyObject* kwds) {
     //Initialize binary tree.
     npy_intp dimTree[1] = { self->total_nodes };
     self->tree = (PyObject*) PyArray_ZEROS(1, dimTree, NPY_FLOAT, 0);
-    if (self->tree == NULL)
+    if (self->tree == NULL) {
+        PyErr_SetString(PyExc_RuntimeError, "Failed to create new binary tree.");
         return -1;
+    }
 
     return 0;
 }
@@ -130,21 +195,32 @@ static PyObject* SumTree_SetPriority(SumTree* self, PyObject* args, void* closur
     if (!PyArg_ParseTuple(args, "|if", &idx, &prio))
         return NULL;
 
-    float* treeData = PyArray_DATA((PyArrayObject*) self->tree);
+    float* treeData = (float*) PyArray_DATA((PyArrayObject*) self->tree);
 
     //Set priority of a transiction.
+    if(idx < 0 || idx >= self->n_leaves) {
+        char msg[150];
+        sprintf(msg, "idx is out of range for SumTree is %d. It must be between 0 and %d.", idx, self->n_leaves-1);
+
+        PyErr_SetString(PyExc_IndexError, msg);
+        return NULL;
+    }
     treeData[(int)pow(2, self->depth) - 1 + idx] = prio;
 
     //Update cumulative priorities that have current transiction as leaf node.
-    int idx_parent = getParentIndex(self, (int)pow(2, self->depth) - 1 + idx);
-    int idx_left_child, idx_right_child;
+    int idx_parent, idx_left_child, idx_right_child;
+
+    if(!getParentIndex(self, (int)pow(2, self->depth) - 1 + idx, &idx_parent))
+        return NULL;
 
     while (idx_parent != -1) {
-        getChildrenIndices(self, idx_parent, &idx_left_child, &idx_right_child);
+        if(!getChildrenIndices(self, idx_parent, &idx_left_child, &idx_right_child))
+            return NULL;
 
         treeData[idx_parent] = treeData[idx_left_child] + treeData[idx_right_child];
 
-        idx_parent = getParentIndex(self, idx_parent);
+        if(!getParentIndex(self, idx_parent, &idx_parent))
+            return NULL;
     }
 
     Py_INCREF(Py_None);
@@ -153,7 +229,10 @@ static PyObject* SumTree_SetPriority(SumTree* self, PyObject* args, void* closur
 
 /* ---------- METHOD get_random_transiction() ---------- */
 static PyObject* SumTree_GetRandomTransiction(SumTree* self, PyObject* Py_UNUSED(ignored)) {
-    long idxTrans = (long) getRandomTransiction(self);
+    int idxTrans;
+    if(!getRandomTransiction(self, &idxTrans))
+        return NULL;
+
     return PyLong_FromLong(idxTrans);
 }
 
@@ -167,10 +246,12 @@ static PyObject* SumTree_SampleBatch(SumTree* self, PyObject* args, void* closur
     //Initialize an empty minibatch.
     npy_intp dims[1] = { batchSize };
     PyObject* batchIdxs = PyArray_SimpleNew(1, dims, NPY_INT);
-    if (batchIdxs == NULL)
+    if (batchIdxs == NULL) {
+        PyErr_SetString(PyExc_RuntimeError, "Failed to create new batch indices.");
         return NULL;
+    }
 
-    int* batchIdxsData = (int*)PyArray_DATA((PyArrayObject*)batchIdxs);
+    int* batchIdxsData = (int*) PyArray_DATA((PyArrayObject*)batchIdxs);
     for (int i = 0; i < batchSize; i++)
         batchIdxsData[i] = -1;
 
@@ -181,7 +262,11 @@ static PyObject* SumTree_SampleBatch(SumTree* self, PyObject* args, void* closur
 
         do {
             isDuplicated = 0;
-            idxTrans = getRandomTransiction(self);
+            if(!getRandomTransiction(self, &idxTrans)) {
+                Py_XDECREF(batchIdxs);
+                batchIdxsData = NULL;
+                return NULL;
+            }
 
             //Check if idxTrans is already sampled.
             for (int j = 0; j < i && !isDuplicated; j++)
@@ -197,19 +282,23 @@ static PyObject* SumTree_SampleBatch(SumTree* self, PyObject* args, void* closur
     return batchIdxs;
 }
 
-/* ---------- METHOD get_probability_of_transiction() ---------- */
-PyObject* SumTree_GetProbabilityOfTransiction(SumTree* self, PyObject* args, void* closure) {
+/* ---------- METHOD get_transiction_probability() ---------- */
+PyObject* SumTree_GetTransictionProbability(SumTree* self, PyObject* args, void* closure) {
     //Method's parameter.
     int idx;
     if (!PyArg_ParseTuple(args, "i", &idx))
         return NULL;
 
     //Compute probability.
-    return PyFloat_FromDouble( getProbabilityOfTransiction(self, idx) );
+    float p;
+    if(!getTransictionProbability(self, idx, &p))
+        return NULL;
+
+    return PyFloat_FromDouble(p);
 }
 
-/* ---------- METHOD get_probability_of_batch() ---------- */
-PyObject* SumTree_GetProbabilityOfBatch(SumTree* self, PyObject* args, void* closure) {
+/* ---------- METHOD get_batch_probability() ---------- */
+PyObject* SumTree_GetBatchProbability(SumTree* self, PyObject* args, void* closure) {
     //Method's parameter.
     PyObject* batchIdxs = NULL;
     if (!PyArg_ParseTuple(args, "O", &batchIdxs))
@@ -223,24 +312,31 @@ PyObject* SumTree_GetProbabilityOfBatch(SumTree* self, PyObject* args, void* clo
     //Create a ndarray to store probabilities.
     npy_intp probsDims[1] = { batchIdxsSize };
     PyObject* probs = PyArray_SimpleNew(1, probsDims, NPY_FLOAT);
-    if (probs == NULL)
+    if (probs == NULL) {
+        PyErr_SetString(PyExc_RuntimeError, "Failed to create new batch probabilities.");
         return NULL;
+    }
 
     //Compute probabilties of batch.
     float* probsData = PyArray_DATA((PyArrayObject*) probs);
-    for (int i = 0; i < batchIdxsSize; i++)
-        probsData[i] = getProbabilityOfTransiction(self, batchIdxsData[i]);
+    for (int i = 0; i < batchIdxsSize; i++) {
+        if(!getTransictionProbability(self, batchIdxsData[i], probsData + i)) {
+            Py_XDECREF(probs);
+            Py_XDECREF(batchIdxs);
+            return NULL;
+        }
+    }
     
     Py_XDECREF(batchIdxs);
     return probs;
 }
 
 static PyMethodDef SumTree_Methods[] = {
-    { "set_priority", (PyCFunction) SumTree_SetPriority, METH_VARARGS, "Set a transiction's priority on tree.\n\nParameters\n--------------------\nidx: int\n\tindex of transiction\n\nprio : float\n\tpriority of transiction\n"},
+    { "set_priority", (PyCFunction) SumTree_SetPriority, METH_VARARGS, "Set a transiction's priority on tree.\n\nParameters\n--------------------\nidx: int\n\tindex of a transiction\n\nprio : float\n\tpriority of the transiction\n"},
     { "get_random_transiction", (PyCFunction) SumTree_GetRandomTransiction, METH_NOARGS, "Return a transiction randomly.\n\nReturn\n--------------------\nidx_trans: int\n\tindex of transiction\n" },
     { "sample_batch", (PyCFunction) SumTree_SampleBatch, METH_VARARGS, "Sample a batch of transiction indices.\n\nParameter\n--------------------\nbatch_size: int\n\tbatch size\n\nReturn\n----------\nbatch_idxs: list\n\tbatch of transiction indices\n"},
-    { "get_probability_of_transiction", (PyCFunction) SumTree_GetProbabilityOfTransiction, METH_VARARGS, "Return probability of a transiction.\n\nParameter\n--------------------\nidx : int\n\tindex of a transiction\n\nReturn\n--------------------\nprob : float\n\tprobability of transiction\n"},
-    { "get_probability_of_batch", (PyCFunction) SumTree_GetProbabilityOfBatch, METH_VARARGS, "Compute probabilities of transiction indices sampled.\n\nParameter\n----------\nbatch_idx: ndarray\n\tminibatch of transiction indices\n\nReturn\n----------\nprobs: ndarray\n\tprobabilities of transiction indices sampled\n" },
+    { "get_transiction_probability", (PyCFunction) SumTree_GetTransictionProbability, METH_VARARGS, "Return probability of a transiction.\n\nParameter\n--------------------\nidx : int\n\tindex of a transiction\n\nReturn\n--------------------\nprob : float\n\tprobability of the transiction\n"},
+    { "get_batch_probability", (PyCFunction) SumTree_GetBatchProbability, METH_VARARGS, "Compute probabilities of transiction indices sampled.\n\nParameter\n----------\nbatch_idx: ndarray\n\tminibatch of transiction indices\n\nReturn\n----------\nprobs: ndarray\n\tprobabilities of transiction indices sampled\n" },
     { NULL }
 };
 

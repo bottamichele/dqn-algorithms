@@ -105,7 +105,7 @@ class PropPriorMemory(Memory):
         
         #Sample index of transictions and probabilties
         idxs = self._cum_prios.sample_batch(batch_size)
-        probs = self._cum_prios.get_probability_of_batch(idxs)
+        probs = self._cum_prios.get_batch_probability(idxs)
         
         idxs = tc.Tensor(idxs).to(dtype=tc.int32, device=self._device)
         probs = tc.Tensor(probs).to(device=self._device)
