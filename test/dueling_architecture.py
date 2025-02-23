@@ -28,7 +28,7 @@ EPSILON_DECAY = 10**-4
 UPDATE_RATE = 250
 MEMORY_SIZE = 5000
 LEARNING_RATE = 10**-3
-DEVICE = tc.device("cuda" if tc.cuda.is_available() else "cpu")
+DEVICE = tc.device("cpu")
 USE_DDQN = True
 USE_PRIORITY_MEMORY = True
 USE_DUELING_ARCHITECTURE = True
@@ -131,8 +131,7 @@ if __name__ == "__main__":
                 if USE_PRIORITY_MEMORY:
                     td_errors = tc.clamp(q_target - q, -1.0, 1.0)
                     memory.update_priorities(td_errors)
-                    memory.beta += beta_decay
-
+                    
             #Updates.
             obs = next_obs
             epsilon = epsilon - EPSILON_DECAY if epsilon > EPSILON_MIN else EPSILON_MIN
@@ -144,5 +143,8 @@ if __name__ == "__main__":
 
         #Print training stats of current epidode ended.
         print("- Episode {:3d}: score = {:3d}; avg score = {:3.2f}; total states = {:>5d}; epsilon = {:.2f}".format(int(episode), int(scores[-1]), np.mean(scores[-100:]), int(total_states), epsilon))
+
+        if USE_PRIORITY_MEMORY:
+            memory.beta += beta_decay
 
     env.close()
