@@ -23,7 +23,7 @@ This library must be installed locally to be used. You need to do the following 
 **DISCLAIMAR:** the compilation of C modules is tested only on Python 3.10.13 and numpy 1.26.3. 
                 However, different versions should be work.
 
-## Get starting
+## Get started
 To understand how to use this library a good start point is to go to the folder `test`, 
 which is used for test the library, contains important things how to setup agents and train them
 by using DQN or its any variant.
