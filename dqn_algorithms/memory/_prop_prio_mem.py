@@ -43,7 +43,7 @@ class PropPriorMemory(Memory):
 
         self._priorities = tc.zeros(max_size, dtype=tc.float32, device=device)      #Priority for each transiction.
         self._cum_prios = SumTree(max_size)                                         #Cumulative priorities.
-        self._alpha = alpha
+        self.alpha = alpha
         self.beta = beta
         self._epsilon = eps                                                         #Small value epsilon.
         self._idxs_sampled = None                                                   #Last sample of batch indices.
@@ -63,14 +63,14 @@ class PropPriorMemory(Memory):
 
         self._cum_prios = SumTree(self._max_size)
         for i in range(self._current_size):
-            self._cum_prios.set_priority(i, self._priorities[i] ** self._alpha)
+            self._cum_prios.set_priority(i, self._priorities[i] ** self.alpha)
 
     def store_transiction(self, obs, action, reward, next_obs, next_obs_done):
         #Set priority for current transiction.
         prio = self._priorities.max().item() if self._current_size > 0 else 1.0
         
         self._priorities[self._current_idx] = prio
-        self._cum_prios.set_priority(self._current_idx, prio**self._alpha)
+        self._cum_prios.set_priority(self._current_idx, prio**self.alpha)
 
         #Store transiction on memory replay.
         super().store_transiction(obs, action, reward, next_obs, next_obs_done)
