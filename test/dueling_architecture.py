@@ -142,7 +142,7 @@ if __name__ == "__main__":
                 target_model.load_state_dict(model.state_dict())
 
         #Print training stats of current epidode ended.
-        print("- Episode {:3d}: score = {:3d}; avg score = {:3.2f}; total states = {:>5d}; epsilon = {:.2f}".format(int(episode), int(scores[-1]), np.mean(scores[-100:]), int(total_states), epsilon))
+        print("- Episode {:3d}: score = {:3.0f}; avg score = {:3.2f}; total states = {:>5d}; epsilon = {:.2f}".format(episode, scores[-1], np.mean(scores[-100:]), total_states, epsilon))
 
         if USE_PRIORITY_MEMORY:
             memory.beta += beta_decay
