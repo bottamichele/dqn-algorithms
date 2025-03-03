@@ -43,7 +43,7 @@ ACTION_SIZE = 0
 # ========================================
 
 if __name__ == "__main__":
-    assert FRAME_STACK >= 2
+    assert FRAME_STACK >= 1
 
     #Create enviroment.
     env = gym.make("CartPole-v1", render_mode="rgb_array")
