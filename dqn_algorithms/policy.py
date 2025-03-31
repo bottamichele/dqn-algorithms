@@ -20,7 +20,7 @@ def e_greedy_policy(model, epsilon, obs):
         action choosen to perform"""
     
     rng = np.random.default_rng()
-    q = model(obs)
+    q = model(obs.unsqueeze(0))
 
     if rng.uniform() <= epsilon:
         return rng.integers(0, q.shape[1]).item()
@@ -43,4 +43,4 @@ def greedy_policy(model, obs):
     action: int
         action choosen to perform"""
 
-    return model(obs).argmax(dim=1).item()
+    return model(obs.unsqueeze(0)).argmax(dim=1).item()

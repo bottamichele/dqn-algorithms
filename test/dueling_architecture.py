@@ -90,7 +90,7 @@ if __name__ == "__main__":
             #Choose action.
             action = e_greedy_policy(model,
                                      epsilon,
-                                     tc.unsqueeze(obs, 0).to(device=DEVICE))
+                                     obs)
 
             #Perform action choosen.
             next_obs, reward, terminated, truncated, _ = env.step(action)
