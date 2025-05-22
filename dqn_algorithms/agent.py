@@ -90,7 +90,7 @@ class DQNAgent:
                                           rew_dtype=tc.float32,
                                           device=device)
         else:
-            raise ValueError("The dict \'mem_params\' does not specify any type of memory replay.")
+            raise ValueError("The dict \'mem_params\' does not specify any known type of memory replay.")
 
     def choose_action(self, obs):
         """Choose an action to perform.
@@ -125,7 +125,12 @@ class DQNAgent:
         self.memory.store_transiction(obs, action, reward, next_obs, next_obs_done)
 
     def train(self):
-        """Do a train step."""
+        """Do a train step.
+        
+        Return
+        --------------------
+        train_infos: dict
+            a dictionary wihch contains some information about the train step computed"""
 
         if len(self.memory) >= self.batch_size:
             #Sample a mini-batch.
@@ -158,6 +163,8 @@ class DQNAgent:
                 self.memory.update_priorities(td_errors)
                     
         self.epsilon = self.epsilon - self.epsilon_decay if self.epsilon > self.epsilon_final else self.epsilon_final
+
+        return {"loss": loss.item()}
 
     def update_target_model(self):
         """Update target model's parameters."""
