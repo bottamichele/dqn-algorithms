@@ -132,6 +132,8 @@ class DQNAgent:
         train_infos: dict
             a dictionary wihch contains some information about the train step computed"""
 
+        infos = {}
+
         if len(self.memory) >= self.batch_size:
             #Sample a mini-batch.
             if isinstance(self.memory, UniformMemory):
@@ -152,6 +154,7 @@ class DQNAgent:
                 loss = mse_loss(q, q_target).to(device=self.device)
             else:
                 loss = tc.mean((q_target - q).pow(2) * weight_b)
+            infos["loss"] = loss.item()
             
             self.optimizer.zero_grad()
             loss.backward()
@@ -164,7 +167,7 @@ class DQNAgent:
                     
         self.epsilon = self.epsilon - self.epsilon_decay if self.epsilon > self.epsilon_final else self.epsilon_final
 
-        return {"loss": loss.item()}
+        return infos
 
     def update_target_model(self):
         """Update target model's parameters."""
