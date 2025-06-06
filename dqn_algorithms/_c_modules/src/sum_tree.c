@@ -89,10 +89,18 @@ static int getChildrenIndices(SumTree* self, int idx_node, int* idx_left_c, int*
  * @param idx_trans transiction index sampled.
  * @return 1 if this function does not raise any exception, 0 otherwise. */
 static int getRandomTransiction(SumTree* self, int* idx_trans) {
+    //Generate a random number between 0 and 1.
+    unsigned int bits[4];
+    for (int i = 0; i < 4; i++)
+        bits[i] = (int)((float)rand() / (float)(RAND_MAX + 1) * 256.f);
+    unsigned int rndInt = (bits[0] << 24) + (bits[1] << 16) + (bits[2] << 8) + bits[3];
+    float rndNum = (float)rndInt / (float)0xFFFFFFFF;
+
+    //Retrieve the transiction.
     float* treeData = (float*) PyArray_DATA((PyArrayObject*) self->tree);
     float up = treeData[0];
     int idx_node = 0;
-    float p = up * ((float)rand() / (float)RAND_MAX);
+    float p = up * rndNum;
     
     int idx_lc, idx_rc;
     if(!getChildrenIndices(self, idx_node, &idx_lc, &idx_rc))
