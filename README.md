@@ -18,7 +18,7 @@ This library includes:
 # Installation
 This library must be installed locally to be used. You need to do the following steps to install it:
 1. download this repository either from this page or by running `git clone https://github.com/bottamichele/dqn-algorithms`
-2. run `pip install <path_repository>` (***<path_repository>*** is path of the downloaded repository)
+2. run `pip install <path_repository>` (***<path_repository>*** is the absolute path of the downloaded repository)
    to install the library with all its dependecies and compiling its C modules.
 
 **WARNING:** the compilation of C modules is only tested with Python v3.10.13 and v3.10.16 and numpy v1.26.3 and v2.1.2. 
