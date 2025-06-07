@@ -19,9 +19,10 @@ EPSILON_MIN = 0.01
 EPSILON_DECAY = 10**-4
 UPDATE_RATE = 250
 MEMORY_SIZE = 5000
+N_STEP = 3
 LEARNING_RATE = 10**-3
 DEVICE = tc.device("cpu")
-USE_PRIORITY_MEMORY = False
+USE_PRIORITY_MEMORY = True
 
 # ========================================
 # =============== COSTANTS ===============
@@ -46,11 +47,13 @@ if __name__ == "__main__":
 
     #Create memory replay params.
     if not USE_PRIORITY_MEMORY:
-        type_memory = "uniform_memory"
+        type_memory = "uniform_memory" if N_STEP == 1 else "n_step_uniform_memory"
     else:
-        type_memory = "proportional_prioritized_memory"
+        type_memory = "proportional_prioritized_memory" if N_STEP == 1 else "n_step_proportional_prioritized_memory"
     
     memory_params = {"type": type_memory, "mem_size": MEMORY_SIZE, "obs_size": OBSERVATION_SIZE}
+    if N_STEP > 1:
+        memory_params.update({"n_step": N_STEP})
     
     #Define DQN training agent.
     agent = DQNAgent(model, memory_params, UPDATE_RATE, BATCH_SIZE, LEARNING_RATE, GAMMA, EPSILON_INIT, EPSILON_MIN, EPSILON_DECAY, DEVICE)
