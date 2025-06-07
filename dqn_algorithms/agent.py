@@ -6,7 +6,7 @@ import torch as tc
 from torch.optim import Adam
 from torch.nn.functional import mse_loss
 
-from dqn_algorithms.memory import UniformMemory, PropPriorMemory
+from dqn_algorithms.memory import UniformMemory, PropPriorMemory, NStepUniformMemory, NStepPropPriorMemory
 from dqn_algorithms.policy import e_greedy_policy
 from dqn_algorithms.q_methods import compute_q_dqn, compute_q_ddqn
 
@@ -79,6 +79,7 @@ class DQNAgent:
                                         tc.int32, 
                                         tc.float32, 
                                         device=device)
+            self._use_per = False
         elif mem_params["type"] == "proportional_prioritized_memory":
             self.memory = PropPriorMemory(mem_params["mem_size"], 
                                           mem_params["obs_size"],
@@ -89,6 +90,30 @@ class DQNAgent:
                                           act_dtype=tc.int32,
                                           rew_dtype=tc.float32,
                                           device=device)
+            self._use_per = True
+        elif mem_params["type"] == "n_step_uniform_memory":
+            self.memory = NStepUniformMemory(mem_params["mem_size"],
+                                             mem_params["n_step"],
+                                             gamma, 
+                                             mem_params["obs_size"], 
+                                             mem_params.get("obs_dtype", tc.float32), 
+                                             tc.int32, 
+                                             tc.float32, 
+                                             device=device)
+            self._use_per = False
+        elif mem_params["type"] == "n_step_proportional_prioritized_memory":
+            self.memory = NStepPropPriorMemory(mem_params["mem_size"],
+                                               mem_params["n_step"],
+                                               gamma,
+                                               mem_params["obs_size"],
+                                               alpha=mem_params.get("alpha", 0.6),
+                                               beta=mem_params.get("beta", 0.4),
+                                               eps=mem_params.get("eps", 10**-5),
+                                               obs_dtype=mem_params.get("obs_dtype", tc.float32),
+                                               act_dtype=tc.int32,
+                                               rew_dtype=tc.float32,
+                                               device=device)
+            self._use_per = True
         else:
             raise ValueError("The dict \'mem_params\' does not specify any known type of memory replay.")
 
@@ -136,10 +161,10 @@ class DQNAgent:
 
         if len(self.memory) >= self.batch_size:
             #Sample a mini-batch.
-            if isinstance(self.memory, UniformMemory):
-                obs_b, action_b, reward_b, next_obs_b, next_obs_done_b = self.memory.sample_batch(self.batch_size)
-            else:
+            if self._use_per:
                 obs_b, action_b, reward_b, next_obs_b, next_obs_done_b, weight_b = self.memory.sample_batch(self.batch_size)
+            else:
+                obs_b, action_b, reward_b, next_obs_b, next_obs_done_b = self.memory.sample_batch(self.batch_size)
 
             next_obs_done_b = next_obs_done_b.to(dtype=tc.int32)
 
@@ -150,10 +175,10 @@ class DQNAgent:
                 q, q_target = compute_q_ddqn(self.model, self.target_model, self.gamma, obs_b, action_b, reward_b, next_obs_b, next_obs_done_b)
 
             #Compute loss and gradient.
-            if isinstance(self.memory, UniformMemory):
-                loss = mse_loss(q, q_target).to(device=self.device)
-            else:
+            if self._use_per:
                 loss = tc.mean((q_target - q).pow(2) * weight_b)
+            else:
+                loss = mse_loss(q, q_target).to(device=self.device)
             infos["loss"] = loss.item()
             
             self.optimizer.zero_grad()
@@ -161,7 +186,7 @@ class DQNAgent:
             self.optimizer.step()
 
             #Update priorities if memory replay is a PER.
-            if isinstance(self.memory, PropPriorMemory):
+            if self._use_per                                                                                                                                                                           :
                 td_errors = tc.clamp(q_target - q, -1.0, 1.0)
                 self.memory.update_priorities(td_errors)
                     

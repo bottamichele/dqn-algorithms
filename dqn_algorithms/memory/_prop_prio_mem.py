@@ -5,7 +5,7 @@ from dqn_algorithms._c_modules.sum_tree import SumTree
 from ._memory import Memory
 
 class PropPriorMemory(Memory):
-    """A proportional prioritized memory replay. It samples a batch in order to transiction's priority."""
+    """A proportional prioritized memory replay. It samples a batch based on transictions' priority."""
 
     def __init__(self, max_size, obs_size, alpha=0.6, beta=0.4, eps=10**-5, obs_dtype=tc.float32, act_dtype=tc.int8, rew_dtype=tc.float32, device=tc.device("cpu")):
         """Create new memory replay.
